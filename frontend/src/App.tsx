@@ -1,3 +1,18 @@
+// Define the shape of our data coming from the Backend
+interface Medicine {
+  id: number;
+  name: string;
+  stock: number;
+  expiry: string;
+  provider: string;
+  is_expiring_soon: boolean;
+  needs_restock: boolean;
+}
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { AlertTriangle, ShoppingCart, Activity } from 'lucide-react';
@@ -9,7 +24,7 @@ const App: React.FC = () => {
 
   const loadData = async (): Promise<void> => {
     try {
-      const res = await axios.get<Medicine[]>('http://127.0.0.1:8000/inventory');
+      const res = await axios.get('/api/inventory')
       setItems(res.data);
       setLoading(false);
     } catch (err) {
