@@ -11,8 +11,6 @@ interface Medicine {
 
 
 
-
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { AlertTriangle, ShoppingCart, Activity } from 'lucide-react';
