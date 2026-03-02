@@ -265,7 +265,6 @@ def get_predictions(db: Session = Depends(get_db)):
 
 Inventory: {json.dumps(enriched)}
 Sales: {json.dumps([{{"name": s.medicine_name, "qty": s.quantity, "date": s.date}} for s in sales])}
-
 Respond with exactly:
 {{
   "predictions": [
