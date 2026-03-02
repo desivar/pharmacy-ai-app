@@ -1,19 +1,28 @@
+import os
+import json
+import re
+import requests
+from datetime import datetime
+from typing import List
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-import requests
-import json
-import re
+from dotenv import load_dotenv
 
-# --- 1. CONFIGURATION ---
-GROQ_API_KEY = "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"
+# --- 1. CONFIGURATION & SECURITY ---
+load_dotenv()  # This loads the variables from your .env file
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama3-8b-8192"
 SUPPLIER_WHATSAPP = "50212345678"
+
+if not GROQ_API_KEY:
+    print("WARNING: GROQ_API_KEY not found in .env file!")
 
 # --- 2. DATABASE SETUP ---
 SQLALCHEMY_DATABASE_URL = "sqlite:///./pharmacy.db"
@@ -111,7 +120,10 @@ def enrich_item(item):
     }
 
 def ask_groq(system_prompt: str, user_prompt: str) -> str:
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}", 
+        "Content-Type": "application/json"
+    }
     body = {
         "model": GROQ_MODEL,
         "messages": [
@@ -122,14 +134,14 @@ def ask_groq(system_prompt: str, user_prompt: str) -> str:
         "max_tokens": 1024
     }
     try:
-        res = requests.post(GRO_URL, headers=headers, json=body, timeout=30)
+        res = requests.post(GROQ_URL, headers=headers, json=body, timeout=30)
         if res.status_code == 503:
             return json.dumps({"response": "AI is busy. Please try again in 10 seconds."})
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"Groq API Error: {str(e)}")
-        return json.dumps({"response": "Error connecting to AI."})
+        return json.dumps({"response": "Error connecting to AI service."})
 
 def parse_json(text: str) -> dict:
     try:
@@ -138,9 +150,10 @@ def parse_json(text: str) -> dict:
             return json.loads(match.group())
         return json.loads(text)
     except Exception:
-        return {"alerts": [], "whatsapp_messages": [], "predictions": [], "summary": "Error parsing AI data"}
+        return {"alerts": [], "whatsapp_messages": [], "predictions": [], "summary": "Error parsing data"}
 
-# --- 5. ROUTES ---
+# --- 5. API ROUTES ---
+
 @app.get("/")
 def home():
     return {"status": "Pharmacy API is running", "docs": "/docs"}
@@ -159,7 +172,12 @@ def process_sale(sale: SaleRequest, db: Session = Depends(get_db)):
     if not item or item.stock < sale.quantity:
         raise HTTPException(status_code=400, detail="Insufficient stock")
     item.stock -= sale.quantity
-    db.add(Sale(medicine_id=item.id, medicine_name=item.name, quantity=sale.quantity, date=datetime.today().strftime("%Y-%m-%d")))
+    db.add(Sale(
+        medicine_id=item.id, 
+        medicine_name=item.name, 
+        quantity=sale.quantity, 
+        date=datetime.today().strftime("%Y-%m-%d")
+    ))
     db.commit()
     return {"status": "success", "remaining_stock": item.stock}
 
@@ -172,7 +190,7 @@ def get_alerts(db: Session = Depends(get_db)):
     if not critical:
         return {"alerts": [], "whatsapp_messages": [], "supplier_whatsapp": SUPPLIER_WHATSAPP}
 
-    system = "You are a pharmacy AI. Respond ONLY with a valid JSON object. No extra text."
+    system = "You are a pharmacy AI. Respond ONLY with a valid JSON object. No markdown."
     user = f"Analyze these issues and return JSON with 'alerts' and 'whatsapp_messages': {json.dumps(critical)}"
     
     raw_text = ask_groq(system, user)
@@ -185,7 +203,7 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
     items = db.query(Medicine).all()
     enriched = [enrich_item(i) for i in items]
     
-    system = "You are a pharmacy assistant. You MUST respond with a JSON object containing a 'response' key."
+    system = "You are a pharmacy assistant. Respond ONLY with a JSON object containing a 'response' key."
     user = f"Inventory: {json.dumps(enriched[:5])}\nQuestion: {req.message}"
     
     raw_text = ask_groq(system, user)
@@ -198,7 +216,7 @@ def get_predictions(db: Session = Depends(get_db)):
     enriched = [enrich_item(i) for i in items]
     
     system = "You are an analyst. Respond ONLY with a JSON object containing 'predictions' and 'summary'."
-    user = f"Predict stock based on this inventory: {json.dumps(enriched)}"
+    user = f"Predict stock trends based on this inventory: {json.dumps(enriched)}"
     
     raw_text = ask_groq(system, user)
     return parse_json(raw_text)
