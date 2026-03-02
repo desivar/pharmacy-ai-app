@@ -247,7 +247,7 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
 
     system = f"""You are a helpful pharmacy assistant. You have access to live inventory and sales data.
 Inventory: {json.dumps(enriched)}
-Sales: {json.dumps([{{"name": s.medicine_name, "qty": s.quantity, "date": s.date}} for s in sales])}
+Sales: {json.dumps([{"name": s.medicine_name, "qty": s.quantity, "date": s.date} for s in sales])}
 Answer concisely and helpfully."""
 
     response = ask_groq(system, req.message)
