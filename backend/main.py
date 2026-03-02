@@ -113,7 +113,7 @@ def enrich_item(item):
 def ask_groq(system_prompt: str, user_prompt: str) -> str:
     headers = {"Authorization": f"Bearer {GROQ_API_KEY", "Content-Type": "application/json"}
     body = {
-        "model": GROQ_MODEL
+        "model": GROQ_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
