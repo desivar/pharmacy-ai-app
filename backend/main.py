@@ -89,9 +89,7 @@ def seed_db(db):
         Medicine(name="Atorvastatin", stock=5, expiry="2026-08-10", provider="MedCorp", min_stock=25, unit_price=15.0),
     ])
     db.commit()
-
-
-def enrich_item(item):
+    def enrich_item(item):
     today = datetime.today()
     try:
         exp_date = datetime.strptime(item.expiry, "%Y-%m-%d")
@@ -117,7 +115,7 @@ def enrich_item(item):
         "needs_restock": item.stock < item.min_stock,
     }
 
-
+# This must be at the same level as enrich_item, not inside it!
 def ask_groq(system_prompt: str, user_prompt: str) -> str:
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -129,157 +127,16 @@ def ask_groq(system_prompt: str, user_prompt: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        "temperature": 0.3,
-        "max_tokens": 1024
+        "temperature": 0.1,
+        "max_tokens": 1024,
+        "response_format": {"type": "json_object"} 
     }
     try:
         res = requests.post(GROQ_URL, headers=headers, json=body, timeout=30)
         res.raise_for_status()
         return res.json()["choices"][0]["message"]["content"]
     except Exception as e:
+        print(f"Groq API Error: {str(e)}") 
         raise HTTPException(status_code=503, detail=f"Groq error: {str(e)}")
 
 
-def parse_json(text: str) -> dict:
-    try:
-        # Use regex to find the actual JSON object inside the text
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match:
-            clean_text = match.group()
-            return json.loads(clean_text)
-        return json.loads(text)
-    except Exception as e:
-        print(f"JSON Parse Error: {e} | Original text: {text}")
-        # Return a safe default so the app doesn't crash
-        return {"alerts": [], "whatsapp_messages": [], "predictions": [], "summary": "Error parsing data"}
-
-
-@app.get("/inventory")
-def get_inventory(db: Session = Depends(get_db)):
-    items = db.query(Medicine).all()
-    if not items:
-        seed_db(db)
-        items = db.query(Medicine).all()
-    return [enrich_item(i) for i in items]
-
-
-@app.post("/inventory")
-def add_medicine(med: MedicineCreate, db: Session = Depends(get_db)):
-    item = Medicine(**med.dict())
-    db.add(item)
-    db.commit()
-    db.refresh(item)
-    return enrich_item(item)
-
-
-@app.put("/inventory/{item_id}")
-def update_medicine(item_id: int, med: MedicineCreate, db: Session = Depends(get_db)):
-    item = db.query(Medicine).filter(Medicine.id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Not found")
-    for k, v in med.dict().items():
-        setattr(item, k, v)
-    db.commit()
-    return enrich_item(item)
-
-
-@app.delete("/inventory/{item_id}")
-def delete_medicine(item_id: int, db: Session = Depends(get_db)):
-    item = db.query(Medicine).filter(Medicine.id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Not found")
-    db.delete(item)
-    db.commit()
-    return {"status": "deleted"}
-
-
-@app.post("/sell")
-def process_sale(sale: SaleRequest, db: Session = Depends(get_db)):
-    item = db.query(Medicine).filter(Medicine.id == sale.item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Medicine not found")
-    if item.stock < sale.quantity:
-        raise HTTPException(status_code=400, detail="Insufficient stock")
-    item.stock -= sale.quantity
-    db.add(Sale(
-        medicine_id=item.id,
-        medicine_name=item.name,
-        quantity=sale.quantity,
-        date=datetime.today().strftime("%Y-%m-%d")
-    ))
-    db.commit()
-    return {"status": "success", "remaining_stock": item.stock}
-
-
-@app.get("/sales")
-def get_sales(db: Session = Depends(get_db)):
-    return db.query(Sale).all()
-
-
-@app.get("/ai/alerts")
-def get_alerts(db: Session = Depends(get_db)):
-    items = db.query(Medicine).all()
-    enriched = [enrich_item(i) for i in items]
-    critical = [i for i in enriched if i["needs_restock"] or i["is_expiring_soon"] or i["is_expired"]]
-
-    if not critical:
-        return {"alerts": [], "whatsapp_messages": [], "supplier_whatsapp": SUPPLIER_WHATSAPP}
-
-    system = "You are a pharmacy inventory AI. Respond ONLY with valid JSON, no extra text."
-    user = f"""Analyze these pharmacy inventory issues and generate alerts and WhatsApp supplier messages.
-
-Issues:
-{json.dumps(critical, indent=2)}
-
-Respond with exactly this JSON structure:
-{{
-  "alerts": [
-    {{"id": 1, "name": "medicine name", "message": "clear alert description", "priority": "critical or warning or info"}}
-  ],
-  "whatsapp_messages": [
-    {{"provider": "supplier name", "message": "professional restock request message", "medicines": ["medicine1"]}}
-  ]
-}}"""
-
-    text = ask_groq(system, user)
-    result = parse_json(text)
-    result["supplier_whatsapp"] = SUPPLIER_WHATSAPP
-    return result
-
-
-@app.post("/ai/chat")
-def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
-    items = db.query(Medicine).all()
-    enriched = [enrich_item(i) for i in items]
-    sales = db.query(Sale).all()
-
-    system = f"""You are a helpful pharmacy assistant. You have access to live inventory and sales data.
-Inventory: {json.dumps(enriched)}
-Sales: {json.dumps([{"name": s.medicine_name, "qty": s.quantity, "date": s.date} for s in sales])}
-Answer concisely and helpfully."""
-
-    response = ask_groq(system, req.message)
-    return {"response": response}
-
-
-@app.get("/ai/predictions")
-def get_predictions(db: Session = Depends(get_db)):
-    items = db.query(Medicine).all()
-    sales = db.query(Sale).all()
-    enriched = [enrich_item(i) for i in items]
-
-    system = "You are a pharmacy AI analyst. Respond ONLY with valid JSON, no extra text."
-    user = f"""Analyze inventory and sales data. Generate stock predictions.
-
-Inventory: {json.dumps(enriched)}
-Sales: {json.dumps([{"name": s.medicine_name, "qty": s.quantity, "date": s.date} for s in sales])}
-Respond with exactly:
-{{
-  "predictions": [
-    {{"name": "medicine", "current_stock": 0, "predicted_days_until_empty": 30, "recommended_order_qty": 50, "trend": "increasing or stable or decreasing"}}
-  ],
-  "summary": "brief overall summary"
-}}"""
-
-    text = ask_groq(system, user)
-    return parse_json(text)
