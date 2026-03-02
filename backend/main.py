@@ -6,10 +6,12 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./pharmacy.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, 
-                       connect_args={"check_same_thread": False})
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 class Medicine(Base):
     __tablename__ = "inventory"
@@ -18,6 +20,7 @@ class Medicine(Base):
     stock = Column(Integer)
     expiry = Column(String)
     provider = Column(String)
+
 
 Base.metadata.create_all(bind=engine)  # ← moved outside the class
 
@@ -30,6 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def get_db():
     db = SessionLocal()
     try:
@@ -37,21 +41,33 @@ def get_db():
     finally:
         db.close()
 
+
 class SaleRequest(BaseModel):
     item_id: int
     quantity: int
+
 
 @app.get("/inventory")
 def get_inventory(db: Session = Depends(get_db)):
     items = db.query(Medicine).all()
     if not items:
-        db.add_all([
-            Medicine(name="Amoxicillin", stock=15, expiry="2026-06-15", provider="PharmaDist"),
-            Medicine(name="Ibuprofen", stock=200, expiry="2027-10-01", provider="MedCorp")
-        ])
+        db.add_all(
+            [
+                Medicine(
+                    name="Amoxicillin",
+                    stock=15,
+                    expiry="2026-06-15",
+                    provider="PharmaDist",
+                ),
+                Medicine(
+                    name="Ibuprofen", stock=200, expiry="2027-10-01", provider="MedCorp"
+                ),
+            ]
+        )
         db.commit()
         items = db.query(Medicine).all()
     return items
+
 
 @app.post("/sell")
 def process_sale(sale: SaleRequest, db: Session = Depends(get_db)):
