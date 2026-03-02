@@ -49,65 +49,26 @@ const App: React.FC = () => {
         </h1>
       </header>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        {items.map((item) => (
-          <div key={item.id} style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            borderLeft: item.is_expiring_soon ? '6px solid #f59e0b' : '6px solid #10b981'
-          }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{item.name}</h2>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Provider: {item.provider}</span>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.95rem' }}>
-                Expires: <strong>{item.expiry}</strong>
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
-              {item.is_expiring_soon && (
-                <div style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
-                  <AlertTriangle size={20} /> 5-Month Rule Triggered
-                </div>
-              )}
-
-              <div style={{ textAlign: 'right', minWidth: '120px' }}>
-                <div style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: 'bold', 
-                  color: item.needs_restock ? '#dc2626' : '#1e293b' 
-                }}>
-                  {item.stock} Units
-                </div>
-                <button 
-                  onClick={() => sellItem(item.id)}
-                  style={{
-                    marginTop: '8px',
-                    padding: '8px 12px',
-                    backgroundColor: '#0f172a',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <ShoppingCart size={16} /> Sell
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-export default App;
+      <div style={{ padding: '20px', backgroundColor: '#ffffff', borderRadius: '8px', marginBottom: '30px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+<h3 style={{ marginTop: 0, color: '#0f172a' }}>Register New Stock</h3>
+<div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+<input id="newName" placeholder="Medicine Name" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #cbd5e1', flex: '1' }} />
+<input id="newStock" type="number" placeholder="Stock" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #cbd5e1', width: '100px' }} />
+<input id="newExpiry" type="date" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+<input id="newProvider" placeholder="Provider" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #cbd5e1', flex: '1' }} />
+<button
+onClick={async () => {
+const name = (document.getElementById('newName') as HTMLInputElement).value;
+const stock = parseInt((document.getElementById('newStock') as HTMLInputElement).value);
+const expiry = (document.getElementById('newExpiry') as HTMLInputElement).value;
+const provider = (document.getElementById('newProvider') as HTMLInputElement).value;
+if (!name || !stock) return alert('Please enter Name and Stock');
+await axios.post('', { name, stock, expiry, provider });
+loadData();
+}}
+style={{ padding: '10px 20px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+>
++ Add to Inventory
+</button>
+</div>
+</div>
