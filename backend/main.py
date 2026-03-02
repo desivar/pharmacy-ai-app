@@ -77,3 +77,16 @@ def process_sale(sale: SaleRequest, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "success"}
     return {"status": "error"}
+
+class MedicineCreate(BaseModel):
+    name: str
+    stock: int
+    expiry: str
+    provider: str
+
+@app.post("/add")
+def add_medicine(data: MedicineCreate, db: Session = Depends(get_db)):
+new_item = Medicine(name=data.name, stock=data.stock, expiry=data.expiry, provider=data.provider)
+db.add(new_item)
+db.commit()
+return {"status": "added"}
