@@ -264,7 +264,7 @@ def get_predictions(db: Session = Depends(get_db)):
     user = f"""Analyze inventory and sales data. Generate stock predictions.
 
 Inventory: {json.dumps(enriched)}
-Sales: {json.dumps([{{"name": s.medicine_name, "qty": s.quantity, "date": s.date}} for s in sales])}
+Sales: {json.dumps([{"name": s.medicine_name, "qty": s.quantity, "date": s.date} for s in sales])}
 Respond with exactly:
 {{
   "predictions": [
