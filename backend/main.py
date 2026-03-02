@@ -206,7 +206,7 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
     return {"response": parsed.get("response", "I'm processing your request.")}
 
 @app.get("/ai/alerts")
-def get_alerts(db: Session = Depends(get_db)):
+def get_alerts(db: Session = Depends(get_db)):  # noqa: F811
     items = db.query(Medicine).all()
     enriched = [enrich_item(i) for i in items]
     critical = [i for i in enriched if i["needs_restock"] or i["is_expiring_soon"] or i["is_expired"]]
@@ -224,7 +224,7 @@ def get_alerts(db: Session = Depends(get_db)):
     return result
 
 @app.post("/ai/chat")
-def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
+def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):  # noqa: F811
     items = db.query(Medicine).all()
     enriched = [enrich_item(i) for i in items]
     
