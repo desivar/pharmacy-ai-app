@@ -205,13 +205,43 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
     parsed = parse_json(raw_text)
     return {"response": parsed.get("response", "I'm processing your request.")}
 
+@app.get("/ai/alerts")
+def get_alerts(db: Session = Depends(get_db)):
+    items = db.query(Medicine).all()
+    enriched = [enrich_item(i) for i in items]
+    critical = [i for i in enriched if i["needs_restock"] or i["is_expiring_soon"] or i["is_expired"]]
+
+    if not critical:
+        return {"alerts": [], "whatsapp_messages": [], "supplier_whatsapp": SUPPLIER_WHATSAPP}
+
+    # GROQ REQUIREMENT: You MUST include the word 'JSON' in the prompt
+    system = "You are a pharmacy AI. Respond ONLY with a valid JSON object. Do not include markdown code blocks or extra text."
+    user = f"Generate a JSON object with 'alerts' and 'whatsapp_messages' for these issues: {json.dumps(critical)}"
+    
+    raw_text = ask_groq(system, user)
+    result = parse_json(raw_text)
+    result["supplier_whatsapp"] = SUPPLIER_WHATSAPP
+    return result
+
+@app.post("/ai/chat")
+def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
+    items = db.query(Medicine).all()
+    enriched = [enrich_item(i) for i in items]
+    
+    system = "You are a pharmacy assistant. You MUST respond with a JSON object containing a 'response' key."
+    user = f"Current Inventory: {json.dumps(enriched[:5])}\nUser Question: {req.message}"
+    
+    raw_text = ask_groq(system, user)
+    parsed = parse_json(raw_text)
+    return {"response": parsed.get("response", "I'm sorry, I had trouble formatting my answer.")}
+
 @app.get("/ai/predictions")
 def get_predictions(db: Session = Depends(get_db)):
     items = db.query(Medicine).all()
     enriched = [enrich_item(i) for i in items]
     
-    system = "You are an analyst. Respond ONLY with a JSON object containing 'predictions' and 'summary'."
-    user = f"Predict stock trends based on this inventory: {json.dumps(enriched)}"
+    system = "You are a data analyst. Respond ONLY with a JSON object containing 'predictions' and 'summary'."
+    user = f"Provide a JSON analysis of this inventory: {json.dumps(enriched)}"
     
     raw_text = ask_groq(system, user)
     return parse_json(raw_text)
