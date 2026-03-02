@@ -9,8 +9,9 @@ from collections import defaultdict
 import requests
 import json
 import os
+import re
 
-GROQ_API_KEY = "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"
+GROQ_API_KEY ="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"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama3-8b-8192"  # free and fast
 SUPPLIER_WHATSAPP = "50212345678"  # replace with real number
@@ -140,10 +141,17 @@ def ask_groq(system_prompt: str, user_prompt: str) -> str:
 
 
 def parse_json(text: str) -> dict:
-    text = text.replace("```json", "").replace("```", "").strip()
-    start = text.find("{")
-    end = text.rfind("}") + 1
-    return json.loads(text[start:end])
+    try:
+        # Use regex to find the actual JSON object inside the text
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            clean_text = match.group()
+            return json.loads(clean_text)
+        return json.loads(text)
+    except Exception as e:
+        print(f"JSON Parse Error: {e} | Original text: {text}")
+        # Return a safe default so the app doesn't crash
+        return {"alerts": [], "whatsapp_messages": [], "predictions": [], "summary": "Error parsing data"}
 
 
 @app.get("/inventory")
