@@ -12,7 +12,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class Medicine(Base):
-tablename = "inventory"
+ tablename = "inventory"
 id = Column(Integer, primary_key=True, index=True)
 name = Column(String)
 stock = Column(Integer)
