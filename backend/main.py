@@ -10,7 +10,7 @@ import requests
 import json
 import os
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_API_KEY_HERE")
+GROQ_API_KEY = "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"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama3-8b-8192"  # free and fast
 SUPPLIER_WHATSAPP = "50212345678"  # replace with real number
