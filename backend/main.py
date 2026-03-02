@@ -5,22 +5,21 @@ from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from collections import defaultdict
 import requests
 import json
-import os
 import re
 
-GROQ_API_KEY ="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"
+# --- CONFIGURATION ---
+GROQ_API_KEY = "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"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama3-8b-8192"  # free and fast
-SUPPLIER_WHATSAPP = "50212345678"  # replace with real number
+GROQ_MODEL = "llama3-8b-8192"
+SUPPLIER_WHATSAPP = "50212345678"
 
+# --- DATABASE SETUP ---
 SQLALCHEMY_DATABASE_URL = "sqlite:///./pharmacy.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
-
 
 class Medicine(Base):
     __tablename__ = "inventory"
@@ -32,7 +31,6 @@ class Medicine(Base):
     min_stock = Column(Integer, default=20)
     unit_price = Column(Float, default=10.0)
 
-
 class Sale(Base):
     __tablename__ = "sales"
     id = Column(Integer, primary_key=True, index=True)
@@ -41,9 +39,9 @@ class Sale(Base):
     quantity = Column(Integer)
     date = Column(String)
 
-
 Base.metadata.create_all(bind=engine)
 
+# --- FASTAPI SETUP ---
 app = FastAPI()
 
 app.add_middleware(
@@ -53,7 +51,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# --- DEPENDENCIES & MODELS ---
 def get_db():
     db = SessionLocal()
     try:
@@ -61,11 +59,9 @@ def get_db():
     finally:
         db.close()
 
-
 class SaleRequest(BaseModel):
     item_id: int
     quantity: int
-
 
 class MedicineCreate(BaseModel):
     name: str
@@ -75,12 +71,11 @@ class MedicineCreate(BaseModel):
     min_stock: int = 20
     unit_price: float = 10.0
 
-
 class ChatRequest(BaseModel):
     message: str
 
-
-def seed_db(db):
+# --- HELPER FUNCTIONS ---
+def seed_db(db: Session):
     db.add_all([
         Medicine(name="Amoxicillin", stock=15, expiry="2026-06-15", provider="PharmaDist", min_stock=30, unit_price=12.5),
         Medicine(name="Ibuprofen", stock=200, expiry="2027-10-01", provider="MedCorp", min_stock=50, unit_price=5.0),
@@ -89,7 +84,8 @@ def seed_db(db):
         Medicine(name="Atorvastatin", stock=5, expiry="2026-08-10", provider="MedCorp", min_stock=25, unit_price=15.0),
     ])
     db.commit()
-    def enrich_item(item):
+
+def enrich_item(item):
     today = datetime.today()
     try:
         exp_date = datetime.strptime(item.expiry, "%Y-%m-%d")
@@ -115,7 +111,6 @@ def seed_db(db):
         "needs_restock": item.stock < item.min_stock,
     }
 
-# This must be at the same level as enrich_item, not inside it!
 def ask_groq(system_prompt: str, user_prompt: str) -> str:
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -139,4 +134,84 @@ def ask_groq(system_prompt: str, user_prompt: str) -> str:
         print(f"Groq API Error: {str(e)}") 
         raise HTTPException(status_code=503, detail=f"Groq error: {str(e)}")
 
+def parse_json(text: str) -> dict:
+    try:
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return json.loads(text)
+    except Exception as e:
+        print(f"JSON Parse Error: {e} | Original: {text}")
+        return {}
 
+# --- ROUTES ---
+@app.get("/inventory")
+def get_inventory(db: Session = Depends(get_db)):
+    items = db.query(Medicine).all()
+    if not items:
+        seed_db(db)
+        items = db.query(Medicine).all()
+    return [enrich_item(i) for i in items]
+
+@app.post("/inventory")
+def add_medicine(med: MedicineCreate, db: Session = Depends(get_db)):
+    item = Medicine(**med.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return enrich_item(item)
+
+@app.post("/sell")
+def process_sale(sale: SaleRequest, db: Session = Depends(get_db)):
+    item = db.query(Medicine).filter(Medicine.id == sale.item_id).first()
+    if not item or item.stock < sale.quantity:
+        raise HTTPException(status_code=400, detail="Insufficient stock or item not found")
+    item.stock -= sale.quantity
+    db.add(Sale(
+        medicine_id=item.id,
+        medicine_name=item.name,
+        quantity=sale.quantity,
+        date=datetime.today().strftime("%Y-%m-%d")
+    ))
+    db.commit()
+    return {"status": "success", "remaining_stock": item.stock}
+
+@app.get("/ai/alerts")
+def get_alerts(db: Session = Depends(get_db)):
+    items = db.query(Medicine).all()
+    enriched = [enrich_item(i) for i in items]
+    critical = [i for i in enriched if i["needs_restock"] or i["is_expiring_soon"] or i["is_expired"]]
+
+    if not critical:
+        return {"alerts": [], "whatsapp_messages": [], "supplier_whatsapp": SUPPLIER_WHATSAPP}
+
+    system = "You are a pharmacy AI. Respond ONLY with a JSON object. No conversational filler."
+    user = f"Analyze these issues and return JSON with 'alerts' and 'whatsapp_messages': {json.dumps(critical)}"
+    
+    raw_text = ask_groq(system, user)
+    result = parse_json(raw_text)
+    result["supplier_whatsapp"] = SUPPLIER_WHATSAPP
+    return result
+
+@app.post("/ai/chat")
+def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
+    items = db.query(Medicine).all()
+    enriched = [enrich_item(i) for i in items]
+    
+    system = f"""You are a pharmacy assistant. Respond ONLY with a JSON object containing a 'response' key.
+    Inventory: {json.dumps(enriched[:10])}""" # Limited for token efficiency
+    
+    raw_text = ask_groq(system, req.message)
+    parsed = parse_json(raw_text)
+    return {"response": parsed.get("response", "I'm processing your request.")}
+
+@app.get("/ai/predictions")
+def get_predictions(db: Session = Depends(get_db)):
+    items = db.query(Medicine).all()
+    enriched = [enrich_item(i) for i in items]
+    
+    system = "You are an analyst. Respond ONLY with a JSON object containing 'predictions' and 'summary'."
+    user = f"Predict stock trends based on this inventory: {json.dumps(enriched)}"
+    
+    raw_text = ask_groq(system, user)
+    return parse_json(raw_text)
