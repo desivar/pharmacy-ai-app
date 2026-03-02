@@ -24,10 +24,10 @@ class Medicine(Base):
 
 app = FastAPI()
 
- app.add_middleware(
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Fixed: was [""] — should be ["*"] to allow all origins
-    allow_methods=["*"],   # Fixed: same issue
+    allow_origins=["*"],   
+    allow_methods=["*"],   
     allow_headers=["*"],
 )
 
