@@ -79,14 +79,22 @@ def process_sale(sale: SaleRequest, db: Session = Depends(get_db)):
     return {"status": "error"}
 
 class MedicineCreate(BaseModel):
-    name: str
-    stock: int
-    expiry: str
-    provider: str
-
+ ____name: str
+ ____stock: int
+ ____expiry: str
+ ____provider: str
 @app.post("/add")
-def add_medicine(data: MedicineCreate, db: Session = Depends(get_db)):
-new_item = Medicine(name=data.name, stock=data.stock, expiry=data.expiry, provider=data.provider)
-db.add(new_item)
-db.commit()
-return {"status": "added"}
+def add_medicine(data: MedicineCreate, db: Session =
+                 Depends(get_db)):
+    new_item = Medicine(
+    name=data.name,
+        stock=data.stock,
+        expiry=data.expiry,
+        provider=data.provider
+        )
+    db.add(new_item)
+    db.commit()
+    return {"status": "added"}
+        
+    
+    
