@@ -150,11 +150,37 @@ export default function App() {
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
   const S: Record<string, React.CSSProperties> = {
-    app: { minHeight: '100vh', backgroundColor: '#0a0f1e', fontFamily: "'Syne', sans-serif", color: '#e2e8f0' },
-    header: { background: 'linear-gradient(135deg, #0a0f1e 0%, #0d1b3e 100%)', borderBottom: '1px solid #1e3a5f', padding: '20px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' },
-    logo: { display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' },
-    tabs: { display: 'flex', gap: '4px', background: '#0d1b3e', padding: '4px', borderRadius: '12px', border: '1px solid #1e3a5f' },
-    tab: (active: boolean): React.CSSProperties => ({ padding: '8px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: "'Syne', sans-serif", background: active ? '#38bdf8' : 'transparent', color: active ? '#0a0f1e' : '#94a3b8', transition: 'all 0.2s' }),
+    app: { minHeight: '100vh',
+       backgroundColor: '#0a0f1e', 
+       fontFamily: "'Syne', sans-serif", 
+       color: '#e2e8f0' },
+    header: { background: 'linear-gradient(135deg, #0a0f1e 0%, #0d1b3e 100%)',
+       borderBottom: '1px solid #1e3a5f', 
+       padding: '20px 40px',
+        display: 'flex',
+         alignItems: 'center',
+          justifyContent: 'space-between', 
+          flexWrap: 'wrap', gap: '12px' },
+    logo: { display: 'flex', 
+      alignItems: 'center',
+       gap: '12px',
+        fontSize: '22px', 
+        fontWeight: 800, 
+        color: '#38bdf8',
+         letterSpacing: '-0.5px' },
+    tabs: { display: 'flex',
+       gap: '4px', 
+       background: '#0d1b3e',
+        padding: '4px', 
+        borderRadius: '12px', 
+        border: '1px solid #1e3a5f' },
+    tab: (active: boolean): React.CSSProperties =>({ padding: '8px 20px',borderRadius: '8px',
+         border: 'none', 
+         cursor: 'pointer',
+          fontSize: '14px', 
+          fontWeight: 600, 
+          fontFamily: "'Syne', sans-serif", 
+          background: active ? '#38bdf8' : 'transparent', color: active ? '#0a0f1e' : '#94a3b8', transition: 'all 0.2s' }),
     body: { padding: '30px 40px' },
     card: { background: 'linear-gradient(135deg, #0d1b3e 0%, #0f2347 100%)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '22px', position: 'relative' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' },
@@ -317,13 +343,16 @@ export default function App() {
                     <div key={i} style={S.card}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                         <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '15px' }}>{p.name}</h3>
-                        <span style={{ fontSize: '20px' }}>{trendIcon[p.trend] || '➡️'}</span>
+                        <span style={{ fontSize: '20px' }}>{trendIcon[typeof p.trend === 'object' ? (p.trend as any).overall_trend : p.trend] || '➡️'}</span>
                       </div>
                       <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 2 }}>
                         <div>Current Stock: <strong style={{ color: '#f1f5f9' }}>{p.current_stock}</strong></div>
                         <div>Days Until Empty: <strong style={{ color: p.predicted_days_until_empty < 14 ? '#ef4444' : '#f59e0b' }}>{p.predicted_days_until_empty}d</strong></div>
                         <div>Recommended Order: <strong style={{ color: '#38bdf8' }}>{p.recommended_order_qty} units</strong></div>
-                        <div>Trend: <span style={S.badge(p.trend === 'increasing' ? '#22c55e' : p.trend === 'decreasing' ? '#ef4444' : '#38bdf8')}>{p.trend}</span></div>
+                        <div>Trend: <span style={S.badge(p.trend === 'increasing' ? '#22c55e' :
+                        p.trend === 'decreasing' ? '#ef4444' :'#38bdf8')}>
+                            {typeof p.trend === 'object' ? (p.trend as any).overall_trend : p.trend}
+                        </span>
                       </div>
                     </div>
                   ))}
