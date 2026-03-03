@@ -320,52 +320,23 @@ export default function App() {
           )}
 
           {/* ── PREDICTIONS ── */}
-          {tab === 'Predictions' && (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-                <h2 style={{ margin: 0, color: '#38bdf8' }}>📊 AI Sales Predictions</h2>
-                <button style={S.btn('#38bdf8')} onClick={loadPredictions} disabled={predLoading}>
-                  <TrendingUp size={15} /> {predLoading ? 'Predicting...' : 'Generate Predictions'}
-                </button>
-              </div>
-
-              {predLoading && <div style={{ textAlign: 'center', padding: '40px', color: '#38bdf8' }}>AI is generating predictions...</div>}
-
-              {predSummary && (
-                <div style={{ ...S.card, marginBottom: '24px', borderLeft: '4px solid #38bdf8' }}>
-                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px', lineHeight: 1.7 }}>{predSummary}</p>
-                </div>
-              )}
-
-              {predictions.length > 0 && (
-                <div style={S.grid}>
-                  {predictions.map((p, i) => (
-                    <div key={i} style={S.card}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                        <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '15px' }}>{p.name}</h3>
-                        <span style={{ fontSize: '20px' }}>{trendIcon[typeof p.trend === 'object' ? (p.trend as any).overall_trend : p.trend] || '➡️'}</span>
-                      </div>
-                      <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 2 }}>
-                        <div>Current Stock: <strong style={{ color: '#f1f5f9' }}>{p.current_stock}</strong></div>
-                        <div>Days Until Empty: <strong style={{ color: p.predicted_days_until_empty < 14 ? '#ef4444' : '#f59e0b' }}>{p.predicted_days_until_empty}d</strong></div>
-                        <div>Recommended Order: <strong style={{ color: '#38bdf8' }}>{p.recommended_order_qty} units</strong></div>
-                        <div>Trend: <span style={S.badge(p.trend === 'increasing' ? '#22c55e' :
-                        p.trend === 'decreasing' ? '#ef4444' :'#38bdf8')}>
-                            {typeof p.trend === 'object' ? (p.trend as any).overall_trend : p.trend}
-                        </span></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!predLoading && predictions.length === 0 && (
-                <div style={{ ...S.card, textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                  Click "Generate Predictions" to get AI-powered sales forecasts.
-                </div>
-              )}
-            </>
-          )}
+          <div key={i} style={S.card}>
+  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+    <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '15px' }}>{p.name}</h3>
+  </div>
+  <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 2 }}>
+    <div>Current Stock: <strong style={{ color: '#f1f5f9' }}>{p.current_stock}</strong></div>
+    <div>Days Until Empty: <strong style={{ color: '#f59e0b' }}>
+      {typeof p.predicted_days_until_empty === 'object' ? JSON.stringify(p.predicted_days_until_empty) : `${p.predicted_days_until_empty}d`}
+    </strong></div>
+    <div>Recommended Order: <strong style={{ color: '#38bdf8' }}>
+      {typeof p.recommended_order_qty === 'object' ? JSON.stringify(p.recommended_order_qty) : `${p.recommended_order_qty} units`}
+    </strong></div>
+    <div>Trend: <span style={S.badge('#38bdf8')}>
+      {typeof p.trend === 'object' ? JSON.stringify(p.trend) : p.trend}
+    </span></div>
+  </div>
+</div>
 
           {/* ── AI CHAT ── */}
           {tab === 'AI Chat' && (
