@@ -352,7 +352,7 @@ export default function App() {
                         <div>Trend: <span style={S.badge(p.trend === 'increasing' ? '#22c55e' :
                         p.trend === 'decreasing' ? '#ef4444' :'#38bdf8')}>
                             {typeof p.trend === 'object' ? (p.trend as any).overall_trend : p.trend}
-                        </span>
+                        </span></div>
                       </div>
                     </div>
                   ))}
