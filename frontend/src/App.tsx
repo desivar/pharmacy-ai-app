@@ -22,7 +22,7 @@ interface Medicine {
 
 interface Alert { id: number; name: string; message: string; priority: string; }
 interface WAMessage { provider: string; message: string; medicines: string[]; }
-interface Prediction { name: string; current_stock: number; predicted_days_until_empty: number; recommended_order_qty: number; trend: string; }
+interface Prediction { name: string; current_stock: number; predicted_days_until_empty: any; recommended_order_qty: any; trend: any; }
 interface ChatMsg { role: 'user' | 'ai'; text: string; }
 
 const TABS = ['Inventory', 'Alerts', 'Predictions', 'AI Chat'] as const;
@@ -34,10 +34,10 @@ const priorityColor: Record<string, string> = {
   info: '#3b82f6',
 };
 
-const trendIcon: Record<string, string> = {
-  increasing: '📈',
-  stable: '➡️',
-  decreasing: '📉',
+const toStr = (val: any): string => {
+  if (val === null || val === undefined) return 'N/A';
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val);
 };
 
 export default function App() {
@@ -124,7 +124,7 @@ export default function App() {
     try {
       const res = await axios.get(`${API}/ai/predictions`);
       setPredictions(res.data.predictions || []);
-      setPredSummary(res.data.summary || '');
+      setPredSummary(toStr(res.data.summary) || '');
     } catch (e) { console.error(e); }
     setPredLoading(false);
   };
@@ -137,9 +137,9 @@ export default function App() {
     setChatLoading(true);
     try {
       const res = await axios.post(`${API}/ai/chat`, { message: msg });
-      setChat(c => [...c, { role: 'ai', text: res.data.response }]);
+      setChat(c => [...c, { role: 'ai', text: toStr(res.data.response) }]);
     } catch (e) {
-      setChat(c => [...c, { role: 'ai', text: 'Could not connect to AI. Make sure backend is running and GROQ_API_KEY is set.' }]);
+      setChat(c => [...c, { role: 'ai', text: 'Could not connect to AI.' }]);
     }
     setChatLoading(false);
   };
@@ -150,37 +150,11 @@ export default function App() {
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
   const S: Record<string, React.CSSProperties> = {
-    app: { minHeight: '100vh',
-       backgroundColor: '#0a0f1e', 
-       fontFamily: "'Syne', sans-serif", 
-       color: '#e2e8f0' },
-    header: { background: 'linear-gradient(135deg, #0a0f1e 0%, #0d1b3e 100%)',
-       borderBottom: '1px solid #1e3a5f', 
-       padding: '20px 40px',
-        display: 'flex',
-         alignItems: 'center',
-          justifyContent: 'space-between', 
-          flexWrap: 'wrap', gap: '12px' },
-    logo: { display: 'flex', 
-      alignItems: 'center',
-       gap: '12px',
-        fontSize: '22px', 
-        fontWeight: 800, 
-        color: '#38bdf8',
-         letterSpacing: '-0.5px' },
-    tabs: { display: 'flex',
-       gap: '4px', 
-       background: '#0d1b3e',
-        padding: '4px', 
-        borderRadius: '12px', 
-        border: '1px solid #1e3a5f' },
-    tab: (active: boolean): React.CSSProperties =>({ padding: '8px 20px',borderRadius: '8px',
-         border: 'none', 
-         cursor: 'pointer',
-          fontSize: '14px', 
-          fontWeight: 600, 
-          fontFamily: "'Syne', sans-serif", 
-          background: active ? '#38bdf8' : 'transparent', color: active ? '#0a0f1e' : '#94a3b8', transition: 'all 0.2s' }),
+    app: { minHeight: '100vh', backgroundColor: '#0a0f1e', fontFamily: "'Syne', sans-serif", color: '#e2e8f0' },
+    header: { background: 'linear-gradient(135deg, #0a0f1e 0%, #0d1b3e 100%)', borderBottom: '1px solid #1e3a5f', padding: '20px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' },
+    logo: { display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' },
+    tabs: { display: 'flex', gap: '4px', background: '#0d1b3e', padding: '4px', borderRadius: '12px', border: '1px solid #1e3a5f' },
+    tab: (active: boolean): React.CSSProperties => ({ padding: '8px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: "'Syne', sans-serif", background: active ? '#38bdf8' : 'transparent', color: active ? '#0a0f1e' : '#94a3b8', transition: 'all 0.2s' }),
     body: { padding: '30px 40px' },
     card: { background: 'linear-gradient(135deg, #0d1b3e 0%, #0f2347 100%)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '22px', position: 'relative' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' },
@@ -224,7 +198,6 @@ export default function App() {
                 </button>
                 <button style={S.btn('#1e3a5f')} onClick={loadInventory}><RefreshCw size={16} /></button>
               </div>
-
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '60px', color: '#38bdf8' }}>Loading inventory...</div>
               ) : (
@@ -269,29 +242,25 @@ export default function App() {
                   <RefreshCw size={15} /> {alertsLoading ? 'Analyzing...' : 'Run AI Analysis'}
                 </button>
               </div>
-
               {alertsLoading && <div style={{ textAlign: 'center', padding: '40px', color: '#38bdf8' }}>AI is analyzing your inventory...</div>}
-
               {!alertsLoading && alerts.length === 0 && (
                 <div style={{ ...S.card, textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                   Click "Run AI Analysis" to check your inventory for issues.
                 </div>
               )}
-
               {alerts.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '30px' }}>
                   {alerts.map((a, i) => (
                     <div key={i} style={{ ...S.card, borderLeft: `4px solid ${priorityColor[a.priority] || '#38bdf8'}` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ color: '#f1f5f9' }}>{a.name}</strong>
-                        <span style={S.badge(priorityColor[a.priority] || '#38bdf8')}>{a.priority}</span>
+                        <strong style={{ color: '#f1f5f9' }}>{toStr(a.name)}</strong>
+                        <span style={S.badge(priorityColor[a.priority] || '#38bdf8')}>{toStr(a.priority)}</span>
                       </div>
-                      <p style={{ margin: '8px 0 0', color: '#94a3b8', fontSize: '14px' }}>{a.message}</p>
+                      <p style={{ margin: '8px 0 0', color: '#94a3b8', fontSize: '14px' }}>{toStr(a.message)}</p>
                     </div>
                   ))}
                 </div>
               )}
-
               {waMessages.length > 0 && (
                 <>
                   <h3 style={{ color: '#25D366', marginBottom: '16px' }}>📱 WhatsApp Supplier Messages</h3>
@@ -299,17 +268,17 @@ export default function App() {
                     {waMessages.map((m, i) => (
                       <div key={i} style={S.card}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                          <strong style={{ color: '#f1f5f9' }}>To: {m.provider}</strong>
-                          <a href={whatsappLink(supplierPhone, m.message)} target="_blank" rel="noreferrer"
+                          <strong style={{ color: '#f1f5f9' }}>To: {toStr(m.provider)}</strong>
+                          <a href={whatsappLink(supplierPhone, toStr(m.message))} target="_blank" rel="noreferrer"
                             style={{ ...S.btn('#25D366'), textDecoration: 'none' }}>
                             <Send size={14} /> Send via WhatsApp
                           </a>
                         </div>
                         <div style={{ background: '#0a0f1e', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#94a3b8', whiteSpace: 'pre-wrap' }}>
-                          {m.message}
+                          {toStr(m.message)}
                         </div>
                         <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {m.medicines.map((med, j) => <span key={j} style={S.badge('#38bdf8')}>{med}</span>)}
+                          {(m.medicines || []).map((med, j) => <span key={j} style={S.badge('#38bdf8')}>{toStr(med)}</span>)}
                         </div>
                       </div>
                     ))}
@@ -320,23 +289,42 @@ export default function App() {
           )}
 
           {/* ── PREDICTIONS ── */}
-          <div key={i} style={S.card}>
-  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-    <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '15px' }}>{p.name}</h3>
-  </div>
-  <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 2 }}>
-    <div>Current Stock: <strong style={{ color: '#f1f5f9' }}>{p.current_stock}</strong></div>
-    <div>Days Until Empty: <strong style={{ color: '#f59e0b' }}>
-      {typeof p.predicted_days_until_empty === 'object' ? JSON.stringify(p.predicted_days_until_empty) : `${p.predicted_days_until_empty}d`}
-    </strong></div>
-    <div>Recommended Order: <strong style={{ color: '#38bdf8' }}>
-      {typeof p.recommended_order_qty === 'object' ? JSON.stringify(p.recommended_order_qty) : `${p.recommended_order_qty} units`}
-    </strong></div>
-    <div>Trend: <span style={S.badge('#38bdf8')}>
-      {typeof p.trend === 'object' ? JSON.stringify(p.trend) : p.trend}
-    </span></div>
-  </div>
-</div>
+          {tab === 'Predictions' && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <h2 style={{ margin: 0, color: '#38bdf8' }}>📊 AI Sales Predictions</h2>
+                <button style={S.btn('#38bdf8')} onClick={loadPredictions} disabled={predLoading}>
+                  <TrendingUp size={15} /> {predLoading ? 'Predicting...' : 'Generate Predictions'}
+                </button>
+              </div>
+              {predLoading && <div style={{ textAlign: 'center', padding: '40px', color: '#38bdf8' }}>AI is generating predictions...</div>}
+              {predSummary !== '' && (
+                <div style={{ ...S.card, marginBottom: '24px', borderLeft: '4px solid #38bdf8' }}>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px', lineHeight: 1.7 }}>{predSummary}</p>
+                </div>
+              )}
+              {predictions.length > 0 && (
+                <div style={S.grid}>
+                  {predictions.map((p, i) => (
+                    <div key={i} style={S.card}>
+                      <h3 style={{ margin: '0 0 12px', color: '#f1f5f9', fontSize: '15px' }}>{toStr(p.name)}</h3>
+                      <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 2 }}>
+                        <div>Current Stock: <strong style={{ color: '#f1f5f9' }}>{toStr(p.current_stock)}</strong></div>
+                        <div>Days Until Empty: <strong style={{ color: '#f59e0b' }}>{toStr(p.predicted_days_until_empty)}</strong></div>
+                        <div>Recommended Order: <strong style={{ color: '#38bdf8' }}>{toStr(p.recommended_order_qty)}</strong></div>
+                        <div>Trend: <span style={S.badge('#38bdf8')}>{toStr(p.trend)}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!predLoading && predictions.length === 0 && (
+                <div style={{ ...S.card, textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                  Click "Generate Predictions" to get AI-powered sales forecasts.
+                </div>
+              )}
+            </>
+          )}
 
           {/* ── AI CHAT ── */}
           {tab === 'AI Chat' && (
