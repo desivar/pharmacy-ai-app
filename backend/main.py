@@ -382,3 +382,8 @@ def get_predictions(db: Session = Depends(get_db), _: User = Depends(require_adm
     system = "You are an analyst. Respond ONLY with a JSON object containing 'predictions' and 'summary'."
     user = f"Predict stock trends: {json.dumps(enriched)}"
     return parse_json(ask_groq(system, user))
+
+if __name__ == "__main__":
+    import uvicorn
+    # Force the backend to run on port 5000
+    uvicorn.run("main:app", host="127.0.0.1", port=5000, reload=True)
