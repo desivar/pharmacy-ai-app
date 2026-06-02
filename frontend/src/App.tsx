@@ -6,7 +6,7 @@ import {
   LogOut, Users, Lock, Eye, EyeOff, Shield
 } from 'lucide-react';
 
-const API = 'http://localhost:5000/api';
+const API = 'http://localhost:5000';
 
 interface Medicine {
   id: number; name: string; stock: number; expiry: string; provider: string;
