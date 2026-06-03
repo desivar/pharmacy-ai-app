@@ -6,7 +6,7 @@ import {
   LogOut, Users, Lock, Eye, EyeOff, Shield
 } from 'lucide-react';
 
-const API = 'http://localhost:5000';
+const API = 'https://pharmacy-backend-o9fm.onrender.com';
 
 interface Medicine {
   id: number; name: string; stock: number; expiry: string; provider: string;

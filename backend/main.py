@@ -154,8 +154,8 @@ def require_admin(current_user: User = Depends(get_current_user)):
 def seed_users(db: Session):
     if not db.query(User).first():
         db.add_all([
-            User(username="admin", hashed_password=hash_password("admin123"), role="admin"),
-            User(username="staff", hashed_password=hash_password("staff123"), role="staff"),
+            User(username="admin", hashed_password=pwd_context.hash("admin123"), role="admin"),
+            User(username="staff", hashed_password=pwd_context.hash("staff123"), role="staff"),
         ])
         db.commit()
 
@@ -240,8 +240,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import os
+
 @app.on_event("startup")
 def startup():
+    # If the file exists, try to remove it before starting
+    if os.path.exists("./pharmacy.db"):
+        try:
+            os.remove("./pharmacy.db")
+        except PermissionError:
+            print("Database file is locked by another process. Please close all terminals.")
+    
     db = SessionLocal()
     seed_users(db)
     if not db.query(Medicine).first():
@@ -386,4 +395,4 @@ def get_predictions(db: Session = Depends(get_db), _: User = Depends(require_adm
 if __name__ == "__main__":
     import uvicorn
     # Force the backend to run on port 5000
-    uvicorn.run("main:app", host="127.0.0.1", port=5000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), reload=False)

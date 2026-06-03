@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "python-dotenv": "^0.0.1-security",
+    "requests": "^0.3.0",
+    "sqlalchemy": "^10.1.1",
+    "uvicorn": "^0.0.1-security"
+  }
+}
