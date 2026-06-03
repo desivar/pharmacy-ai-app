@@ -4,9 +4,9 @@ A modern, intelligent dashboard for pharmacies to manage stock, predict sales, a
 
 ## 📸 System Previews
 
-![Dashboard](assets/inventory.png)
-![Alerts](assets/alerts.png)
-![Predictions](assets/predictions.png)
+![Dashboard](frontend/src/assets/inventory.png)
+![Alerts](frontend/src/assets/alerts.png)
+![Predictions](frontend/src/assets/predictions.png)
 
 ---
 
