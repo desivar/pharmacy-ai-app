@@ -1,8 +1,13 @@
   💊 AI-Powered Pharmacy Management System
 A modern, intelligent dashboard for pharmacies to manage stock, predict sales, and communicate with suppliers using AI.
 ![Dashboard](assets/screenshot.pn)
+<<<<<<< HEAD
 ![Alerts](assets/Screenshot 2026-06-02 210054.png)
 ![Predictions](assets/Screenshot 2026-06-02 210043.png)
+=======
+![Alerts](assets/screenshot.png)
+![Predictions](assets/screenshot.png)
+>>>>>>> 78a1c9eee7d2b563bd75508706f51684a163194a
 
 🌟 Key Features
 Role-Based Access: Secure login for Admin (User management) and Staff (Inventory tasks).
