@@ -239,8 +239,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.get("/")
+def read_root():
+    return {"message": "Pharmacy Backend is running!", "status": "active"}
 
-import os
 
 @app.on_event("startup")
 def startup():
