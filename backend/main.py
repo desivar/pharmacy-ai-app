@@ -246,15 +246,10 @@ def read_root():
 
 @app.on_event("startup")
 def startup():
-    # If the file exists, try to remove it before starting
-    if os.path.exists("./pharmacy.db"):
-        try:
-            os.remove("./pharmacy.db")
-        except PermissionError:
-            print("Database file is locked by another process. Please close all terminals.")
-    
+    # We remove the os.remove() logic so data persists!
     db = SessionLocal()
     seed_users(db)
+    # Check if inventory is empty before seeding
     if not db.query(Medicine).first():
         seed_inventory(db)
     db.close()
