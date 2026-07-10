@@ -234,7 +234,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Make sure this matches your frontend port
+    allow_origins=[ "https://pharmacy-ai-app.onrender.com",
+        "http://localhost:5173",],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
