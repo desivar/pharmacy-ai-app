@@ -234,9 +234,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ "https://pharmacy-ai-app.onrender.com",
-        "http://localhost:5173",],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # you don't need cookies since you use Bearer tokens
     allow_methods=["*"],
     allow_headers=["*"],
 )
