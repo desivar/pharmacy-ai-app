@@ -215,16 +215,21 @@ def tostr(val) -> str:
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Make sure this matches your frontend port
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # you don't need cookies since you use Bearer tokens
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 @app.on_event("startup")
 def startup():
+<<<<<<< HEAD
+=======
+    # We remove the os.remove() logic so data persists!
+>>>>>>> 32c0869703181abd528df391784dc745e37ba206
     db = SessionLocal()
     seed_users(db)
+    # Check if inventory is empty before seeding
     if not db.query(Medicine).first():
         seed_inventory(db)
     db.close()
