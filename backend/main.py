@@ -18,7 +18,7 @@ from jose import JWTError, jwt
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_API_KEY_HERE")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "openai/gpt-oss-20b"
 SUPPLIER_WHATSAPP = "50212345678"
 
 SECRET_KEY = os.getenv("SECRET_KEY", "pharmacy-secret-key-change-this-in-production")
@@ -78,7 +78,7 @@ class MedicineCreate(BaseModel):
     min_stock: int = 20
     unit_price: float = 10.0
     class ChatRequest(BaseModel):
-    message: str
+        message: str
 
 
 class UserCreate(BaseModel):
@@ -120,7 +120,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
-     try:
+    try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
@@ -146,7 +146,7 @@ def seed_users(db: Session):
         ])
         db.commit()
         def seed_inventory(db: Session):
-    db.add_all([
+            db.add_all([
         Medicine(name="Amoxicillin", stock=15, expiry="2026-06-15", provider="PharmaDist", min_stock=30, unit_price=12.5),
         Medicine(name="Ibuprofen", stock=200, expiry="2027-10-01", provider="MedCorp", min_stock=50, unit_price=5.0),
         Medicine(name="Paracetamol", stock=8, expiry="2025-12-01", provider="PharmaDist", min_stock=50, unit_price=3.5),
@@ -154,7 +154,7 @@ def seed_users(db: Session):
         Medicine(name="Atorvastatin", stock=5, expiry="2026-08-10", provider="MedCorp", min_stock=25, unit_price=15.0),
     ])
     db.commit()
-  def enrich_item(item):
+def enrich_item(item):
     today = datetime.today()
     try:
         exp_date = datetime.strptime(item.expiry, "%Y-%m-%d")
