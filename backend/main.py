@@ -145,8 +145,10 @@ def seed_users(db: Session):
             User(username="staff", hashed_password=hash_password("staff123"), role="staff"),
         ])
         db.commit()
-        def seed_inventory(db: Session):
-            db.add_all([
+
+
+def seed_inventory(db: Session):
+    db.add_all([
         Medicine(name="Amoxicillin", stock=15, expiry="2026-06-15", provider="PharmaDist", min_stock=30, unit_price=12.5),
         Medicine(name="Ibuprofen", stock=200, expiry="2027-10-01", provider="MedCorp", min_stock=50, unit_price=5.0),
         Medicine(name="Paracetamol", stock=8, expiry="2025-12-01", provider="PharmaDist", min_stock=50, unit_price=3.5),
@@ -223,16 +225,14 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
-<<<<<<< HEAD
-=======
     # We remove the os.remove() logic so data persists!
->>>>>>> 32c0869703181abd528df391784dc745e37ba206
     db = SessionLocal()
     seed_users(db)
     # Check if inventory is empty before seeding
     if not db.query(Medicine).first():
         seed_inventory(db)
     db.close()
+
     # ── AUTH ROUTES ──────────────────────────────────────────
 
 @app.post("/auth/login", response_model=Token)
