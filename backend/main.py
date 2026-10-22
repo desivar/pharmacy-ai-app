@@ -2,28 +2,29 @@ import os
 import json
 import re
 import requests
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Float
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from dotenv import load_dotenv
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
 load_dotenv()
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_API_KEY_HERE")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "openai/gpt-oss-20b"
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 SUPPLIER_WHATSAPP = "50212345678"
 
 SECRET_KEY = os.getenv("SECRET_KEY", "pharmacy-secret-key-change-this-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8 hours
+
 SQLALCHEMY_DATABASE_URL = "sqlite:///./pharmacy.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -31,6 +32,7 @@ Base = declarative_base()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
 
 # ── MODELS ──────────────────────────────────────────────
 
@@ -40,6 +42,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     role = Column(String, default="staff")  # "admin" or "staff"
+
 
 class Medicine(Base):
     __tablename__ = "inventory"
@@ -60,6 +63,7 @@ class Sale(Base):
     quantity = Column(Integer)
     date = Column(String)
 
+
 Base.metadata.create_all(bind=engine)
 
 
@@ -77,8 +81,10 @@ class MedicineCreate(BaseModel):
     provider: str
     min_stock: int = 20
     unit_price: float = 10.0
-    class ChatRequest(BaseModel):
-        message: str
+
+
+class ChatRequest(BaseModel):
+    message: str
 
 
 class UserCreate(BaseModel):
@@ -92,7 +98,9 @@ class Token(BaseModel):
     token_type: str
     role: str
     username: str
-    # ── HELPERS ──────────────────────────────────────────────
+
+
+# ── HELPERS ──────────────────────────────────────────────
 
 def get_db():
     db = SessionLocal()
@@ -108,9 +116,11 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
+
+
 def create_token(data: dict) -> str:
     to_encode = data.copy()
-    to_encode["exp"] = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode["exp"] = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -131,6 +141,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     return user
+
 
 def require_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
@@ -156,6 +167,8 @@ def seed_inventory(db: Session):
         Medicine(name="Atorvastatin", stock=5, expiry="2026-08-10", provider="MedCorp", min_stock=25, unit_price=15.0),
     ])
     db.commit()
+
+
 def enrich_item(item):
     today = datetime.today()
     try:
@@ -176,23 +189,29 @@ def enrich_item(item):
     }
 
 
-def ask_groq(system_prompt: str, user_prompt: str) -> str:
+def ask_groq(system_prompt: str, user_prompt: str, json_mode: bool = True) -> str:
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     body = {
         "model": GROQ_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ],
-        "temperature": 0.1, "max_tokens": 1024
+        "temperature": 0.1,
+        "max_tokens": 4096,        # gpt-oss is a reasoning model; 1024 can run out before the answer
+        "reasoning_effort": "low",
     }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
     try:
-        res = requests.post(GROQ_URL, headers=headers, json=body, timeout=30)
-        res.raise_for_status()
-        return res.json()["choices"][0]["message"]["content"]
+        res = requests.post(GROQ_URL, headers=headers, json=body, timeout=60)
     except Exception as e:
         print(f"Groq error: {e}")
-        return '{"error": "AI unavailable"}'
+        raise HTTPException(status_code=502, detail="AI unavailable")
+    if not res.ok:
+        print(f"Groq error: {res.status_code} {res.text}")
+        raise HTTPException(status_code=502, detail=f"AI provider error: {res.text[:200]}")
+    return res.json()["choices"][0]["message"]["content"] or ""
 
 
 def parse_json(text: str) -> dict:
@@ -202,41 +221,38 @@ def parse_json(text: str) -> dict:
             return json.loads(match.group())
         return json.loads(text)
     except Exception:
+        print(f"Could not parse AI response: {text[:500]}")
         return {"alerts": [], "whatsapp_messages": [], "predictions": [], "summary": "Error parsing AI response"}
-
-def tostr(val) -> str:
-    if val is None:
-        return "N/A"
-    if isinstance(val, dict):
-        return json.dumps(val)
-    return str(val)
 
 
 # ── APP SETUP ────────────────────────────────────────────
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,  # you don't need cookies since you use Bearer tokens
+    allow_credentials=False,  # not needed: auth uses Bearer tokens, not cookies
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 @app.get("/")
 def read_root():
     return {"message": "Pharmacy Backend is running!", "status": "active"}
 
+
 @app.on_event("startup")
 def startup():
-    # We remove the os.remove() logic so data persists!
     db = SessionLocal()
     seed_users(db)
-    # Check if inventory is empty before seeding
     if not db.query(Medicine).first():
         seed_inventory(db)
     db.close()
 
-    # ── AUTH ROUTES ──────────────────────────────────────────
+
+# ── AUTH ROUTES ──────────────────────────────────────────
 
 @app.post("/auth/login", response_model=Token)
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -245,6 +261,8 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     token = create_token({"sub": user.username, "role": user.role})
     return {"access_token": token, "token_type": "bearer", "role": user.role, "username": user.username}
+
+
 @app.get("/auth/me")
 def get_me(current_user: User = Depends(get_current_user)):
     return {"username": current_user.username, "role": current_user.role}
@@ -275,6 +293,8 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User 
     db.delete(user)
     db.commit()
     return {"status": "deleted"}
+
+
 # ── INVENTORY ROUTES ─────────────────────────────────────
 
 @app.get("/inventory")
@@ -285,7 +305,7 @@ def get_inventory(db: Session = Depends(get_db), _: User = Depends(get_current_u
 
 @app.post("/inventory")
 def add_medicine(med: MedicineCreate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    item = Medicine(**med.dict())
+    item = Medicine(**med.model_dump())
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -297,7 +317,7 @@ def update_medicine(item_id: int, med: MedicineCreate, db: Session = Depends(get
     item = db.query(Medicine).filter(Medicine.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Not found")
-    for k, v in med.dict().items():
+    for k, v in med.model_dump().items():
         setattr(item, k, v)
     db.commit()
     return enrich_item(item)
@@ -319,15 +339,20 @@ def process_sale(sale: SaleRequest, db: Session = Depends(get_db), _: User = Dep
     if not item or item.stock < sale.quantity:
         raise HTTPException(status_code=400, detail="Insufficient stock")
     item.stock -= sale.quantity
-    db.add(Sale(medicine_id=item.id, medicine_name=item.name, quantity=sale.quantity, date=datetime.today().strftime("%Y-%m-%d")))
+    db.add(Sale(medicine_id=item.id, medicine_name=item.name, quantity=sale.quantity,
+                date=datetime.today().strftime("%Y-%m-%d")))
     db.commit()
     return {"status": "success", "remaining_stock": item.stock}
 
 
 @app.get("/sales")
 def get_sales(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    return db.query(Sale).all()
-# ── AI ROUTES (admin only) ───────────────────────────────
+    sales = db.query(Sale).all()
+    return [{"id": s.id, "medicine_id": s.medicine_id, "medicine_name": s.medicine_name,
+             "quantity": s.quantity, "date": s.date} for s in sales]
+
+
+# ── AI ROUTES ────────────────────────────────────────────
 
 @app.get("/ai/alerts")
 def get_alerts(db: Session = Depends(get_db), _: User = Depends(require_admin)):
@@ -337,29 +362,45 @@ def get_alerts(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     if not critical:
         return {"alerts": [], "whatsapp_messages": [], "supplier_whatsapp": SUPPLIER_WHATSAPP}
     system = "You are a pharmacy AI. Respond ONLY with a valid JSON object. No markdown."
-    user = f"Analyze these issues and return JSON with 'alerts' and 'whatsapp_messages': {json.dumps(critical)}"
+    user = (
+        "Analyze these inventory issues. Return JSON exactly in this shape: "
+        '{"alerts":[{"id":1,"name":"medicine name","message":"short explanation",'
+        '"priority":"critical|warning|info"}],'
+        '"whatsapp_messages":[{"provider":"provider name","message":"polite reorder message",'
+        '"medicines":["medicine name"]}]}. '
+        "One alert per medicine. One WhatsApp message per provider, listing that provider's medicines. "
+        f"Issues: {json.dumps(critical)}"
+    )
     result = parse_json(ask_groq(system, user))
     result["supplier_whatsapp"] = SUPPLIER_WHATSAPP
     return result
+
+
 @app.post("/ai/chat")
 def ai_chat(req: ChatRequest, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     items = db.query(Medicine).all()
     enriched = [enrich_item(i) for i in items]
-    system = f"You are a pharmacy assistant. Inventory: {json.dumps(enriched[:5])}. Answer helpfully and concisely."
-    response = ask_groq(system, req.message)
-    try:
-        parsed = parse_json(response)
-        return {"response": tostr(parsed.get("response", response))}
-    except Exception:
-        return {"response": response}
+    system = (
+        f"You are a pharmacy assistant. Current inventory: {json.dumps(enriched)}. "
+        "Answer helpfully and concisely in plain text."
+    )
+    return {"response": ask_groq(system, req.message, json_mode=False)}
+
+
 @app.get("/ai/predictions")
-def get_predictions(db: Session = Depends(get_db), _: 
-    User = Depends(require_admin)):    
-    items = db.query(Medicine).all()    
-    enriched = [enrich_item(i) for i in items]   
-    system = "You are an analyst. Respond ONLY with a JSON object containing 'predictions' and 'summary'."   
-    user = f"Predict stock trends: {json.dumps(enriched)}"   
+def get_predictions(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    items = db.query(Medicine).all()
+    enriched = [enrich_item(i) for i in items]
+    system = "You are an inventory analyst. Respond ONLY with a valid JSON object. No markdown."
+    user = (
+        "Predict stock trends. Return JSON exactly in this shape: "
+        '{"predictions":[{"name":"medicine name","current_stock":0,"predicted_days_until_empty":0,'
+        '"recommended_order_qty":0,"trend":"increasing|stable|decreasing"}],'
+        '"summary":"two or three sentence overview"}. '
+        f"Inventory: {json.dumps(enriched)}"
+    )
     return parse_json(ask_groq(system, user))
+
 
 if __name__ == "__main__":
     import uvicorn
